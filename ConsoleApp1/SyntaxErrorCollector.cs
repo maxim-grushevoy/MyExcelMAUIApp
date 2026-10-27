@@ -31,7 +31,7 @@ internal sealed class SyntaxErrorCollector : BaseErrorListener, IAntlrErrorListe
         _errors.Add(new FormulaSyntaxError(start, length, text));
     }
 
-    // помилки лексера (невідомий символ)
+    // помилки лексера(невідомий символ)
     public void SyntaxError(TextWriter output, IRecognizer recognizer, int offendingSymbol,
         int line, int charPositionInLine, string msg, RecognitionException e)
     {
