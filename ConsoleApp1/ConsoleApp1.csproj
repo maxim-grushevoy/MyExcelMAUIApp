@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+		<PackageReference Include="Antlr4BuildTasks" Version="12.8" PrivateAssets="all" />
+
+		<Antlr4 Include="Grammar\SpreadsheetExpression.g4">
+			<Package>SpreadsheetExpressions.Grammar</Package>
+			<Visitor>true</Visitor>
+			<Listener>false</Listener>
+		</Antlr4>
+	</ItemGroup>
+</Project>
