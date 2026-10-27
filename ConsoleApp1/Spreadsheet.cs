@@ -39,6 +39,16 @@ public sealed class Spreadsheet : ICellValueResolver
 
     public Cell GetCell(int row, int column) => _rows[row][column];
 
+    /// <summary>Клітинка за адресою, напр. "B12".</summary>
+    public Cell GetCell(string address)
+    {
+        if (!CellAddress.TryParse(address, out int row, out int column)
+            || row >= RowCount || column >= ColumnCount)
+            throw new ArgumentException($"Клітинки {address} не існує.", nameof(address));
+
+        return _rows[row][column];
+    }
+
     public double GetRowHeight(int row) => _rowHeights[row];
     public double GetColumnWidth(int column) => _columnWidths[column];
 
@@ -47,6 +57,13 @@ public sealed class Spreadsheet : ICellValueResolver
 
     public void SetExpression(int row, int column, string expression)
         => _rows[row][column].Expression = expression ?? string.Empty;
+
+    /// <summary>Змінює вираз клітинки та перераховує клітинки, що від неї залежать.</summary>
+    public void UpdateCellAndRecalculateDependents(int row, int column, string expression)
+    {
+        SetExpression(row, column, expression);
+        Recalculate();
+    }
 
     // ---------- зміна кількості рядків і стовпчиків ----------
 
@@ -111,6 +128,9 @@ public sealed class Spreadsheet : ICellValueResolver
     {
         if (cell.IsEvaluated) return;
 
+        cell.ErrorStart = null;
+        cell.ErrorLength = 0;
+
         if (cell.IsEmpty)
         {
             cell.Value = BigInteger.Zero;
@@ -128,6 +148,8 @@ public sealed class Spreadsheet : ICellValueResolver
             {
                 cell.Value = null;
                 cell.Error = syntaxErrors[0].ToString();
+                cell.ErrorStart = syntaxErrors[0].StartIndex;
+                cell.ErrorLength = syntaxErrors[0].Length;
             }
             else
             {

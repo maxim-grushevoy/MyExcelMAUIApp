@@ -26,6 +26,7 @@
       <Button Text="Порахувати" Clicked="CalculateButton_Clicked" />
       <Button x:Name="modeButton" Text="Режим: ВИРАЗ" Clicked="ModeButton_Clicked" />
       <Button Text="Довідка" Clicked="HelpButton_Clicked" />
+      <Button Text="Про програму" Clicked="AboutButton_Clicked" />
       <Button Text="Вийти" Clicked="ExitButton_Clicked" />
     </FlexLayout>
 

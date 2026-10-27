@@ -23,12 +23,13 @@ namespace MyExcelMAUIApp
     public MainPage()
     {
       InitializeComponent();
-      CreateGrid();
+      UpdateGridDimensions();
     }
 
     // ---------- створення таблиці ----------
 
-    private void CreateGrid()
+    // (пере)будує сітку за поточними розмірами таблиці
+    private void UpdateGridDimensions()
     {
       grid.Children.Clear();
       grid.RowDefinitions.Clear();
@@ -36,7 +37,7 @@ namespace MyExcelMAUIApp
 
       AddColumnsAndColumnLabels();
       AddRowsAndCellEntries();
-      RefreshCells();
+      UpdateUI();
     }
 
     // заголовок, на який можна натиснути (номер рядка або літера стовпчика)
@@ -115,7 +116,7 @@ namespace MyExcelMAUIApp
     }
 
     // показує у клітинках вирази або значення, підсвічує клітинки з помилками
-    private void RefreshCells()
+    private void UpdateUI()
     {
       var table = controller.Table;
 
@@ -141,44 +142,66 @@ namespace MyExcelMAUIApp
       }
     }
 
+    // повідомлення про помилку (або вміст клітинки) у рядку стану
+    private void ShowErrorInUI(string message) => statusLabel.Text = message;
+
     private void ShowCellStatus(int row, int col)
     {
       var cell = controller.Table.GetCell(row, col);
       string address = CellAddress.Format(row, col);
 
-      statusLabel.Text = cell.Error is not null
-        ? $"{address}: {cell.Error}"
-        : cell.IsEmpty ? $"{address}: порожня клітинка" : $"{address}: {cell.Expression}";
+      if (cell.Error is not null)
+        ShowErrorInUI($"{address}: {cell.Error}");
+      else
+        statusLabel.Text = cell.IsEmpty ? $"{address}: порожня клітинка" : $"{address}: {cell.Expression}";
     }
 
     // ---------- події клітинок ----------
 
-    private void Entry_Focused(object sender, FocusEventArgs e)
+    private void Entry_Focused(object? sender, FocusEventArgs e)
     {
-      var entry = (Entry)sender;
-      ShowCellStatus(Grid.GetRow(entry) - 1, Grid.GetColumn(entry) - 1);
+      var entry = (Entry)sender!;
+      int row = Grid.GetRow(entry) - 1;
+      int col = Grid.GetColumn(entry) - 1;
+      ShowCellStatus(row, col);
+
+      // локалізація помилки: виділяємо у виразі фрагмент, де виявлено синтаксичну помилку
+      var cell = controller.Table.GetCell(row, col);
+      if (isFormulaMode && cell.ErrorStart is int start)
+      {
+        int length = cell.ErrorLength;
+        Dispatcher.Dispatch(() =>
+        {
+          int textLength = entry.Text?.Length ?? 0;
+          int position = Math.Min(start, textLength);
+          entry.CursorPosition = position;
+          entry.SelectionLength = Math.Min(length, textLength - position);
+        });
+      }
     }
 
     // викликається, коли користувач вийде зі зміненої клітинки (втратить фокус)
-    private void Entry_Unfocused(object sender, FocusEventArgs e)
+    private void Entry_Unfocused(object? sender, FocusEventArgs e)
     {
       if (!isFormulaMode) return;
 
-      var entry = (Entry)sender;
-      int row = Grid.GetRow(entry) - 1;
-      int col = Grid.GetColumn(entry) - 1;
+      var entry = (Entry)sender!;
+      OnCellEdit(Grid.GetRow(entry) - 1, Grid.GetColumn(entry) - 1, entry.Text ?? "");
+    }
 
-      controller.UpdateCellExpression(row, col, entry.Text ?? "");
-      RefreshCells();
+    private void OnCellEdit(int row, int col, string expression)
+    {
+      controller.UpdateCellExpression(row, col, expression);
+      UpdateUI();
       ShowCellStatus(row, col);
     }
 
     // ---------- кнопки ----------
 
-    private void CalculateButton_Clicked(object sender, EventArgs e)
+    private void CalculateButton_Clicked(object? sender, EventArgs e)
     {
       controller.Recalculate();
-      RefreshCells();
+      UpdateUI();
 
       int errors = controller.Table.ErrorCount;
       statusLabel.Text = errors == 0
@@ -186,14 +209,16 @@ namespace MyExcelMAUIApp
         : $"Обчислено. Клітинок з помилками: {errors} (виділені червоним).";
     }
 
-    private void ModeButton_Clicked(object sender, EventArgs e)
+    private void ModeButton_Clicked(object? sender, EventArgs e) => ToggleDisplayMode();
+
+    private void ToggleDisplayMode()
     {
       isFormulaMode = !isFormulaMode;
       modeButton.Text = isFormulaMode ? "Режим: ВИРАЗ" : "Режим: ЗНАЧЕННЯ";
-      RefreshCells();
+      UpdateUI();
     }
 
-    private async void SaveButton_Clicked(object sender, EventArgs e)
+    private async void SaveButton_Clicked(object? sender, EventArgs e)
     {
       if (controller.FilePath is null)
         await SaveAsAsync();
@@ -201,7 +226,7 @@ namespace MyExcelMAUIApp
         await TrySaveAsync(controller.FilePath);
     }
 
-    private async void SaveAsButton_Clicked(object sender, EventArgs e) => await SaveAsAsync();
+    private async void SaveAsButton_Clicked(object? sender, EventArgs e) => await SaveAsAsync();
 
     private async Task SaveAsAsync()
     {
@@ -212,7 +237,7 @@ namespace MyExcelMAUIApp
       name = name.Trim();
       if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
       {
-        await DisplayAlert("Помилка", "Назва файлу містить недопустимі символи.", "OK");
+        await DisplayAlertAsync("Помилка", "Назва файлу містить недопустимі символи.", "OK");
         return;
       }
 
@@ -229,12 +254,19 @@ namespace MyExcelMAUIApp
       }
       catch (Exception ex)
       {
-        await DisplayAlert("Помилка збереження", ex.Message, "OK");
+        await DisplayAlertAsync("Помилка збереження", ex.Message, "OK");
       }
     }
 
-    private async void ReadButton_Clicked(object sender, EventArgs e)
+    private async void ReadButton_Clicked(object? sender, EventArgs e)
     {
+      if (controller.IsModified)
+      {
+        bool proceed = await DisplayAlertAsync("Підтвердження",
+          "Є незбережені зміни. Відкрити інший файл без збереження?", "Так", "Ні");
+        if (!proceed) return;
+      }
+
       var file = await FilePicker.Default.PickAsync(new PickOptions
       {
         PickerTitle = "Виберіть файл таблиці",
@@ -245,52 +277,68 @@ namespace MyExcelMAUIApp
       try
       {
         controller.LoadTable(file.FullPath);
-        CreateGrid();
+        UpdateGridDimensions();
         statusLabel.Text = $"Прочитано: {file.FullPath}";
       }
       catch (Exception ex)
       {
-        await DisplayAlert("Помилка читання", ex.Message, "OK");
+        await DisplayAlertAsync("Помилка читання", ex.Message, "OK");
       }
     }
 
-    private async void ExitButton_Clicked(object sender, EventArgs e)
+    private async void ExitButton_Clicked(object? sender, EventArgs e)
     {
-      bool answer = await DisplayAlert("Підтвердження", "Ви дійсно хочете вийти?", "Так", "Ні");
+      string message = controller.IsModified
+        ? "Є незбережені зміни. Ви дійсно хочете вийти без збереження?"
+        : "Ви дійсно хочете вийти?";
+
+      bool answer = await DisplayAlertAsync("Підтвердження", message, "Так", "Ні");
       if (answer)
       {
         System.Environment.Exit(0);
       }
     }
 
-    private async void HelpButton_Clicked(object sender, EventArgs e)
+    private async void HelpButton_Clicked(object? sender, EventArgs e)
     {
-      await DisplayAlert("Довідка",
-        "Лабораторна робота 1. Електронна таблиця, варіант 4.\n" +
-        "Клітинка містить вираз (необов'язково з «=» на початку): цілі числа довільної довжини, " +
-        "посилання на клітинки (A1), дужки, операції + - * /, mod, div, унарні + -, " +
-        "функції mmax(...) та mmin(...).\n" +
-        "Кнопка «Режим» перемикає відображення ВИРАЗ / ЗНАЧЕННЯ. " +
-        "Клітинки з помилками підсвічуються червоним, текст помилки видно в рядку стану.\n" +
+      await DisplayAlertAsync("Довідка",
+        "Клітинка містить вираз (необов'язково з «=» на початку).\n" +
+        "У виразі можна використовувати: цілі числа довільної довжини, посилання на клітинки (A1, B12), " +
+        "круглі дужки, операції + - * /, mod, div, унарні + та -, функції mmax(...) і mmin(...) " +
+        "з одним або більше аргументами. Пропуски ігноруються.\n\n" +
+        "Кнопка «Режим» перемикає відображення ВИРАЗ / ЗНАЧЕННЯ. У режимі ЗНАЧЕННЯ клітинки лише для читання.\n\n" +
+        "Помилки: клітинка з помилкою підсвічується червоним, текст помилки показано в рядку стану; " +
+        "якщо помилка синтаксична, при вході в клітинку виділяється фрагмент виразу з помилкою.\n\n" +
         "Кнопки «＋ Рядок у кінець» і «＋ Стовпчик у кінець» додають рядок або стовпчик унизу чи праворуч. " +
         "Щоб додати в довільне місце, видалити або змінити розмір, натисніть на номер рядка " +
-        "або на літеру стовпчика — з'явиться меню.",
+        "або на літеру стовпчика — з'явиться меню.\n\n" +
+        "Таблицю можна зберегти («Зберегти», «Зберегти як») у файл у папці «Документи» та прочитати знову.",
+        "OK");
+    }
+
+    private async void AboutButton_Clicked(object? sender, EventArgs e)
+    {
+      await DisplayAlertAsync("Про програму",
+        "Електронна таблиця\n" +
+        "Лабораторна робота № 1, варіант 4\n" +
+        "(операції: + - * /, mod, div, унарні + -, функції mmax, mmin).\n\n" +
+        "Аналіз виразів: ANTLR 4. Інтерфейс: .NET MAUI.",
         "OK");
     }
 
     // ---------- рядки і стовпчики ----------
 
-    private void AddRowButton_Clicked(object sender, EventArgs e)
+    private void AddRowButton_Clicked(object? sender, EventArgs e)
     {
       controller.InsertRow(controller.Table.RowCount);
-      CreateGrid();
+      UpdateGridDimensions();
       statusLabel.Text = $"Додано рядок {controller.Table.RowCount} у кінець таблиці.";
     }
 
-    private void AddColumnButton_Clicked(object sender, EventArgs e)
+    private void AddColumnButton_Clicked(object? sender, EventArgs e)
     {
       controller.InsertColumn(controller.Table.ColumnCount);
-      CreateGrid();
+      UpdateGridDimensions();
       statusLabel.Text = $"Додано стовпчик {CellAddress.ColumnName(controller.Table.ColumnCount - 1)} у кінець таблиці.";
     }
 
@@ -305,30 +353,30 @@ namespace MyExcelMAUIApp
       const string delete = "Видалити рядок";
       const string resize = "Змінити висоту";
 
-      string action = await DisplayActionSheet($"Рядок {row + 1}", "Скасувати", delete, above, below, resize);
+      string action = await DisplayActionSheetAsync($"Рядок {row + 1}", "Скасувати", delete, above, below, resize);
 
       switch (action)
       {
         case above:
           controller.InsertRow(row);
-          CreateGrid();
-          statusLabel.Text = $"Додано рядок {row + 1} (вище попереднього {row + 1}-го).";
+          UpdateGridDimensions();
+          statusLabel.Text = $"Додано новий рядок {row + 1}.";
           break;
 
         case below:
           controller.InsertRow(row + 1);
-          CreateGrid();
-          statusLabel.Text = $"Додано рядок {row + 2} (нижче рядка {row + 1}).";
+          UpdateGridDimensions();
+          statusLabel.Text = $"Додано новий рядок {row + 2} (нижче рядка {row + 1}).";
           break;
 
         case delete:
           if (controller.Table.RowCount == 1)
           {
-            await DisplayAlert("Помилка", "Не можна видалити останній рядок.", "OK");
+            await DisplayAlertAsync("Помилка", "Не можна видалити останній рядок.", "OK");
             break;
           }
           controller.DeleteRow(row);
-          CreateGrid();
+          UpdateGridDimensions();
           statusLabel.Text = $"Видалено рядок {row + 1}.";
           break;
 
@@ -353,30 +401,30 @@ namespace MyExcelMAUIApp
       const string delete = "Видалити стовпчик";
       const string resize = "Змінити ширину";
 
-      string action = await DisplayActionSheet($"Стовпчик {name}", "Скасувати", delete, left, right, resize);
+      string action = await DisplayActionSheetAsync($"Стовпчик {name}", "Скасувати", delete, left, right, resize);
 
       switch (action)
       {
         case left:
           controller.InsertColumn(col);
-          CreateGrid();
+          UpdateGridDimensions();
           statusLabel.Text = $"Додано стовпчик ліворуч від {name}.";
           break;
 
         case right:
           controller.InsertColumn(col + 1);
-          CreateGrid();
+          UpdateGridDimensions();
           statusLabel.Text = $"Додано стовпчик праворуч від {name}.";
           break;
 
         case delete:
           if (controller.Table.ColumnCount == 1)
           {
-            await DisplayAlert("Помилка", "Не можна видалити останній стовпчик.", "OK");
+            await DisplayAlertAsync("Помилка", "Не можна видалити останній стовпчик.", "OK");
             break;
           }
           controller.DeleteColumn(col);
-          CreateGrid();
+          UpdateGridDimensions();
           statusLabel.Text = $"Видалено стовпчик {name}.";
           break;
 
@@ -400,7 +448,7 @@ namespace MyExcelMAUIApp
           && size >= 20 && size <= 500)
         return size;
 
-      await DisplayAlert("Помилка", "Розмір має бути числом від 20 до 500.", "OK");
+      await DisplayAlertAsync("Помилка", "Розмір має бути числом від 20 до 500.", "OK");
       return null;
     }
   }

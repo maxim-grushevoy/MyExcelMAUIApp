@@ -11,6 +11,9 @@ public sealed class SpreadsheetController
     /// <summary>Файл, з яким пов'язана таблиця (null — ще не збережена).</summary>
     public string? FilePath { get; private set; }
 
+    /// <summary>Є незбережені зміни.</summary>
+    public bool IsModified { get; private set; }
+
     /// <summary>
     /// Записує вираз у клітинку, перевіряє синтаксис, обчислює значення
     /// та перераховує залежні клітинки.
@@ -21,30 +24,32 @@ public sealed class SpreadsheetController
         var cell = Table.GetCell(row, column);
         if (cell.Expression == expression) return cell.Error;
 
-        Table.SetExpression(row, column, expression);
-        Table.Recalculate();
+        Table.UpdateCellAndRecalculateDependents(row, column, expression);
+        IsModified = true;
         return cell.Error;
     }
 
     public void Recalculate() => Table.Recalculate();
 
-    public void InsertRow(int index) => Table.InsertRow(index);
-    public void InsertColumn(int index) => Table.InsertColumn(index);
-    public void DeleteRow(int index) => Table.DeleteRow(index);
-    public void DeleteColumn(int index) => Table.DeleteColumn(index);
+    public void InsertRow(int index) { Table.InsertRow(index); IsModified = true; }
+    public void InsertColumn(int index) { Table.InsertColumn(index); IsModified = true; }
+    public void DeleteRow(int index) { Table.DeleteRow(index); IsModified = true; }
+    public void DeleteColumn(int index) { Table.DeleteColumn(index); IsModified = true; }
 
-    public void SetRowHeight(int row, double height) => Table.SetRowHeight(row, height);
-    public void SetColumnWidth(int column, double width) => Table.SetColumnWidth(column, width);
+    public void SetRowHeight(int row, double height) { Table.SetRowHeight(row, height); IsModified = true; }
+    public void SetColumnWidth(int column, double width) { Table.SetColumnWidth(column, width); IsModified = true; }
 
     public void SaveTable(string path)
     {
         SpreadsheetStorage.Save(Table, path);
         FilePath = path;
+        IsModified = false;
     }
 
     public void LoadTable(string path)
     {
         Table = SpreadsheetStorage.Load(path);
         FilePath = path;
+        IsModified = false;
     }
 }
