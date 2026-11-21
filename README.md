@@ -3,16 +3,22 @@
 Застосунок для роботи з електронними таблицями. Клітинки містять арифметичні вирази; вирази
 перевіряються (синтаксичний аналіз з локалізацією помилок) і обчислюються.
 
+
+
+**Файл README.md було зроблено за допомогою claude ai Sonnet 5.5 з метою навчитися робити файли по типу README.md.**
+
+
+
 **Варіант 4** — набір операцій 1, 2, 3, 7:
-бінарні `+ - * /`, `mod`, `div`, унарні `+ -`, функції `mmax(x1,…,xN)` та `mmin(x1,…,xN)` (N ≥ 1).
+бінарні `+ - \* /`, `mod`, `div`, унарні `+ -`, функції `mmax(x1,…,xN)` та `mmin(x1,…,xN)` (N ≥ 1).
 У виразах: цілі числа довільної довжини, круглі дужки, імена клітинок (`A3`).
 
 ## Структура
 
-| Проєкт | Призначення |
-|---|---|
-| `ConsoleApp1` | бібліотека (Class Library): граматика ANTLR, парсер, обчислювач, модель таблиці, контролер, збереження |
-| `MyExcelMAUIApp` | користувацький інтерфейс (.NET MAUI, Windows) |
+|Проєкт|Призначення|
+|-|-|
+|`ConsoleApp1`|бібліотека (Class Library): граматика ANTLR, парсер, обчислювач, модель таблиці, контролер, збереження|
+|`MyExcelMAUIApp`|користувацький інтерфейс (.NET MAUI, Windows)|
 
 ## Збірка і запуск
 
@@ -25,11 +31,14 @@
 
 ## Відповідність діаграмам
 
-| Діаграма | У коді |
-|---|---|
-| `SpreadsheetForm` | `MainPage` (`UpdateGridDimensions`, `OnCellEdit`, `ToggleDisplayMode`, `ShowErrorInUI`, `UpdateUI`) |
-| `SpreadsheetController` | `SpreadsheetController` (`LoadTable`, `SaveTable`, `UpdateCellExpression`, `InsertRow`, `InsertColumn`) |
-| `Spreadsheet` | `Spreadsheet` (`GetCell`, `InsertRow`, `InsertColumn`, `UpdateCellAndRecalculateDependents`) |
-| `Cell` | `Cell` (значення — `BigInteger`, бо числа довільної довжини) |
-| `Parser` | `FormulaParser` (`ValidateSyntax`), граматика `Grammar/SpreadsheetExpression.g4` |
-| `ExpressionEvaluator` | `FormulaEvaluator` (`ComputeValue`) + `FormulaVisitor` |
+|Діаграма|У коді|
+|-|-|
+|`SpreadsheetForm`|`MainPage` (`UpdateGridDimensions`, `OnCellEdit`, `ToggleDisplayMode`, `ShowErrorInUI`, `UpdateUI`)|
+|`SpreadsheetController`|`SpreadsheetController` (`LoadTable`, `SaveTable`, `UpdateCellExpression`, `InsertRow`, `InsertColumn`)|
+|`Spreadsheet`|`Spreadsheet` (`GetCell`, `InsertRow`, `InsertColumn`, `UpdateCellAndRecalculateDependents`)|
+|`Cell`|`Cell` (значення — `BigInteger`, бо числа довільної довжини)|
+|`Parser`|`FormulaParser` (`ValidateSyntax`), граматика `Grammar/SpreadsheetExpression.g4`|
+|`ExpressionEvaluator`|`FormulaEvaluator` (`ComputeValue`) + `FormulaVisitor`|
+
+
+
